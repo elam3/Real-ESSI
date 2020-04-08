@@ -1,0 +1,131 @@
+Bootstrap: docker
+From: ubuntu:18.04
+
+%files
+    files/mpitest.c /opt
+    files/essi.parallel.20.01.for_ubuntu1804 /usr/local/bin
+    files/essi.sequential.20.01.for_ubuntu1804 /usr/local/bin
+    files/keyboard-configuration.conf /tmp
+    files/Real-ESSI_gmESSI.tgz /tmp
+    files/_Real-ESSI_pvESSI_.tgz /tmp
+
+%environment
+    # Ignore user prompt when installing xorg
+    export DEBIAN_FRONTEND=noninteractive
+
+    # timezone
+    export TZ=America/Los_Angeles
+
+    # environment paths for gmESSI
+    export GMESSI_DIR=/usr/local/gmESSI
+    export PATH=$GMESSI_DIR/bin:$PATH
+    export INCLUDE=$GMESSI_DIR/include:$INCLUDE
+    export CPATH=$GMESSI_DIR/include:$CPATH
+    export FPATH=$GMESSI_DIR/include:$FPATH
+
+%post
+    echo -e "\e[96mUpdating package manager\e[0m"
+    apt-get update && \
+        apt-get upgrade -y && \
+        apt-get dist-upgrade && \
+        apt-get autoremove && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    echo -e "\e[96mSet locale\e[39m"
+    apt-get install -y locales && \
+        locale-gen en_US.UTF-8 && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    #echo -e "\e[96mSet timezone\e[0m"
+    #ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    #    echo $TZ > /etc/timezone && \
+    #    apt-get install -y tzdata && \
+    #    echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+
+    echo -e "\e[96mInstalling Real-ESSI required libraries...\e[0m"
+    apt-get install -y libboost-all-dev libhdf5-dev libtbb-dev libssl1.0.0 && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    echo -e "\e[96mInstalling Real-ESSI Parallel required libraries...\e[0m"
+    apt-get install -y libboost-all-dev libhdf5-dev libtbb-dev libssl1.0.0 mpich libopenmpi-dev openssh-client && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    echo -e "\e[96mInstalling Real-ESSI binaries...\e[0m"
+    cd /usr/local/bin && \
+        chmod a+x /usr/local/bin/essi.parallel.20.01.for_ubuntu1804 && \
+        chmod a+x /usr/local/bin/essi.sequential.20.01.for_ubuntu1804 && \
+        ln -s /usr/local/bin/essi.parallel.20.01.for_ubuntu1804 /usr/local/bin/pessi && \
+        ln -s /usr/local/bin/essi.parallel.20.01.for_ubuntu1804 /usr/local/bin/essi_parallel && \
+        ln -s /usr/local/bin/essi.sequential.20.01.for_ubuntu1804 /usr/local/bin/essi && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    echo -e "\e[96mInstall Real-ESSI gmESSI...\e[0m"
+    apt-get install -y liboctave-dev libboost-all-dev python-dev && \
+        mkdir -p /opt/gmessi && \
+        cd /opt/gmessi && \
+        tar xzf /tmp/Real-ESSI_gmESSI.tgz -C /opt/gmessi && \
+        make -j `nproc` && \
+        make install && \
+        chmod -R a+r /usr/local/ggmESSI/ && \
+        rm -rf /opt/gmessi && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    apt-get install wget git && \
+        wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add - && \
+        apt-get install apt-transport-https && \
+        echo "deb https://download.sublimetext.com/ apt/stable/" | tee /etc/apt/sources.list.d/sublime-text.list && \
+        apt-get update && apt-get install sublime-text && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+
+    # Configure debconf keyboard-configuration
+    echo -e "\e[96mConfiguring debconf keyboard-configuration...\e[0m"
+    apt-get install -y debconf-utils && \
+        debconf-set-selections < /tmp/keyboard-configuration.conf && 
+        rm /tmp/keyboard-configuration.conf && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    # Installing X11
+    echo -e "\e[96mInstall X11 ServerGUI/Client...\e[0m"
+    apt-get install -y xauth xorg openbox && \
+        echo -e "...\e[92mOK\e[0m" || echo -e "...\e[91mFAIL\e[0m"
+
+    echo -e "\e[96mCompiling the MPI application...\e[0m"
+    cd /opt && mpicc -o mpitest mpitest.c
+
+    
+    # Install ParaView with pvESSI plugin
+    apt install libavformat-dev 
+    apt install libswscale-dev 
+    apt install ffmpeg 
+    apt install libphonon-dev libphonon4 qt4-dev-tools 
+    apt install g++ gcc cmake-curses-gui libqt4-opengl-dev 
+    apt install mesa-common-dev python-dev 
+    apt install mpich libopenmpi-dev 
+    apt install libxmu-dev libxi-dev
+    #
+    # Newer Libraries
+    apt install libvtk6.3-qt
+    apt install libqtcore4 libqtgui4 qt4-qmake libxt-dev 
+    #
+    # Unable to locate theme engine in module_path: "pixmap"
+    # Unable to locate theme engine in module_path: "murrine"
+    # https://superuser.com/questions/337639/unable-to-locate-theme-engine-in-module-path-murrine
+    apt install gtk2-engines-murrine gtk2-engines-pixbuf
+    apt install mesa-utils libnvidia-gl-435
+    
+    git clone https://github.com/Kitware/ParaView.git 
+    cd ParaView 
+    git checkout v5.2.0 
+    git submodule update --init 
+    cd Plugins && mkdir Real-ESSI-pvESSI 
+    tar xzf /tmp/_Real-ESSI_pvESSI_.tgz -C Real-ESSI-pvESSI 
+    chown -R $USER:$USER Real-ESSI-pvESSI 
+    cd .. &&  mkdir build && cd build 
+    cmake -DPARAVIEW_USE_MPI=true -DPARAVIEW_ENABLE_PYTHON=true -DPARAVIEW_ENABLE_FFMPEG=true .. 
+    make -j 40
+
+
+    # Cleaning Packaging Caches and Temporary Package Downloads
+    apt-get clean
